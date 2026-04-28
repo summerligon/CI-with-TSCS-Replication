@@ -1,0 +1,26 @@
+# R artifacts
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Output files (generated — not committed, download from CI artifacts)
+output/*.pdf
+output/*.png
+output/*.csv
+output/*.tex
+output/*.html
+output/*.RData
+
+# Keep the output directory tracked
+!output/.gitkeep
+
+# Data files (download separately per data/README.md)
+data/*.dta
+data/*.csv
+data/*.rds
+data/*.RData
+
+# OS
+.DS_Store
+Thumbs.db

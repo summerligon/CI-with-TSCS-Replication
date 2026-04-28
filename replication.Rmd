@@ -1,0 +1,375 @@
+---
+title: "Replication: How to Make Causal Inferences with Time-Series Cross-Sectional Data under Selection on Observables"
+subtitle: "Blackwell & Glynn (2018), *American Political Science Review* 112(4): 1067–1082"
+author: "Replication code"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+    fig_width: 8
+    fig_height: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache   = FALSE
+)
+# Run the full pipeline once here so all downstream chunks have access
+# to the objects created in each script.
+source(here::here("R", "00_setup.R"))
+source(here::here("R", "01_data_prep.R"))
+source(here::here("R", "02_analysis.R"))
+```
+
+## Overview
+
+This document replicates the analysis in:
+
+> Blackwell, Matthew, and Adam Glynn. 2018. "How to Make Causal Inferences with Time-Series Cross-Sectional Data under Selection on Observables." *American Political Science Review* 112(4): 1067–1082. <https://doi.org/10.1017/S0003055418000357>
+
+The paper develops methods for causal inference with TSCS panel data under **selection on observables**: situations where treatment assignment depends on observed, time-varying covariates. The key method is **inverse probability weighting (IPW)** applied within a **marginal structural model (MSM)** framework.
+
+---
+
+## 1  Setup — Packages
+
+```{r packages, eval=FALSE}
+# Already loaded in the setup chunk above.
+# To install packages independently, run:
+source(here::here("R", "00_setup.R"))
+```
+
+---
+
+## 2  Data
+
+```{r data, eval=FALSE}
+# Data loaded in the setup chunk above.
+# To re-run data preparation independently:
+source(here::here("R", "01_data_prep.R"))
+```
+
+### 2.1  Data summary
+
+```{r data-summary}
+dplyr::glimpse(panel)
+```
+
+### 2.2  Treatment prevalence over time
+
+```{r treatment-prevalence, fig.cap="Share of units under treatment (democracy) in each year."}
+panel %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarise(prop_treated = mean(democracy), .groups = "drop") %>%
+  ggplot2::ggplot(ggplot2::aes(x = year, y = prop_treated)) +
+  ggplot2::geom_line(colour = "steelblue", linewidth = 1) +
+  ggplot2::geom_point(colour = "steelblue") +
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ggplot2::labs(
+    x = "Year", y = "Proportion under treatment",
+    title = "Treatment prevalence over time"
+  ) +
+  theme_bw()
+```
+
+---
+
+## 3  Core Analysis
+
+```{r analysis, eval=FALSE}
+# Analysis run in the setup chunk above.
+# To re-run independently:
+source(here::here("R", "02_analysis.R"))
+```
+
+---
+
+## 4  Tables
+
+### Table 1: Summary Statistics
+
+```{r table1}
+sum_stat <- panel %>%
+  dplyr::select(
+    `Log GDP per capita` = lgdppc,
+    `Democracy (D=1)`    = democracy,
+    `Education`          = education,
+    `Trade Openness`     = trade,
+    `Lagged Log GDP pc`  = lgdppc_lag
+  ) %>%
+  tidyr::pivot_longer(everything(), names_to = "Variable", values_to = "value") %>%
+  dplyr::group_by(Variable) %>%
+  dplyr::summarise(
+    N    = dplyr::n(),
+    Mean = mean(value, na.rm = TRUE),
+    SD   = sd(value,   na.rm = TRUE),
+    Min  = min(value,  na.rm = TRUE),
+    Max  = max(value,  na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+kableExtra::kable(
+  sum_stat,
+  digits  = 3,
+  caption = "Table 1: Summary Statistics"
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+### Table 2: Propensity Score Model
+
+```{r table2}
+ps_coef_df <- broom::tidy(ps_denom_model, conf.int = TRUE) %>%
+  dplyr::mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  dplyr::select(
+    Term           = term,
+    Estimate       = estimate,
+    `Std. Error`   = std.error,
+    `z value`      = statistic,
+    `Pr(>|z|)`     = p.value,
+    `95% CI Lower` = conf.low,
+    `95% CI Upper` = conf.high
+  )
+
+kableExtra::kable(
+  ps_coef_df,
+  digits  = 4,
+  caption = "Table 2: Propensity Score Denominator Model (Logistic Regression)"
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+### Table 3: Main Results
+
+```{r table3}
+fmt_pval <- function(p) {
+  dplyr::case_when(
+    p < 0.001 ~ "< 0.001",
+    p < 0.01  ~ paste0(round(p, 3), "**"),
+    p < 0.05  ~ paste0(round(p, 3), "*"),
+    TRUE      ~ as.character(round(p, 3))
+  )
+}
+
+results_formatted <- results_table %>%
+  dplyr::mutate(
+    `95% CI`   = paste0("[", round(Estimate - 1.96 * Std.Error, 3),
+                        ", ", round(Estimate + 1.96 * Std.Error, 3), "]"),
+    p.value    = fmt_pval(p.value),
+    Estimate   = round(Estimate, 4),
+    Std.Error  = round(Std.Error, 4)
+  ) %>%
+  dplyr::select(Estimator, Estimate, `Std. Error` = Std.Error, `95% CI`, `p-value` = p.value)
+
+kableExtra::kable(
+  results_formatted,
+  caption = "Table 3: Effect of Democracy on Log GDP per Capita under Alternative Estimators"
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  kableExtra::row_spec(nrow(results_formatted), bold = TRUE, background = "#e8f4fd")
+```
+
+> **Note:** The IPW / MSM row (highlighted) is the preferred estimator from Blackwell & Glynn (2018).  
+> Standard errors are cluster-robust, clustered by country.  
+> \* p < 0.05, \*\* p < 0.01.
+
+### Table 4: Balance Diagnostics
+
+```{r table4}
+balance_formatted <- balance_df %>%
+  dplyr::rename(
+    Covariate            = covariate,
+    `SMD (Unweighted)`   = smd_unweighted,
+    `SMD (IPW Weighted)` = smd_weighted
+  ) %>%
+  dplyr::mutate(across(where(is.numeric), ~ round(.x, 4)))
+
+kableExtra::kable(
+  balance_formatted,
+  digits  = 4,
+  caption = "Table 4: Standardised Mean Differences Before and After IPW Weighting"
+) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+---
+
+## 5  Figures
+
+Define a shared theme:
+
+```{r theme}
+theme_replication <- function() {
+  ggplot2::theme_bw(base_size = 12) +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      strip.background = ggplot2::element_rect(fill = "grey90", colour = NA),
+      legend.position  = "bottom"
+    )
+}
+```
+
+### Figure 1: Distribution of IPW Weights
+
+```{r figure1, fig.cap="Distribution of stabilised inverse probability weights. Values near 1 indicate little reweighting."}
+ggplot2::ggplot(panel, ggplot2::aes(x = ipw_cumulative_trim)) +
+  ggplot2::geom_histogram(bins = 50, fill = "steelblue", color = "white", alpha = 0.8) +
+  ggplot2::geom_vline(xintercept = 1, linetype = "dashed", colour = "red", linewidth = 0.7) +
+  ggplot2::labs(
+    x       = "Stabilised IPW Weight (trimmed at 99th percentile)",
+    y       = "Count",
+    title   = "Figure 1: Distribution of Inverse Probability Weights",
+    caption = "Red dashed line at weight = 1 (no reweighting)."
+  ) +
+  ggplot2::scale_x_continuous(labels = scales::comma) +
+  theme_replication()
+```
+
+### Figure 2: Covariate Balance (Love Plot)
+
+```{r figure2, fig.cap="Standardised mean differences before and after IPW weighting. Values inside ±0.1 (dashed lines) indicate good balance."}
+balance_long <- balance_df %>%
+  tidyr::pivot_longer(
+    cols      = c(smd_unweighted, smd_weighted),
+    names_to  = "Type",
+    values_to = "SMD"
+  ) %>%
+  dplyr::mutate(
+    Type = dplyr::recode(Type,
+      smd_unweighted = "Unweighted",
+      smd_weighted   = "IPW Weighted"
+    ),
+    Type = factor(Type, levels = c("Unweighted", "IPW Weighted")),
+    covariate = dplyr::recode(covariate,
+      lgdppc_lag = "Lagged Log GDP pc",
+      education  = "Education",
+      trade      = "Trade Openness"
+    )
+  )
+
+ggplot2::ggplot(
+  balance_long,
+  ggplot2::aes(x = SMD, y = covariate, colour = Type, shape = Type)
+) +
+  ggplot2::geom_point(size = 3) +
+  ggplot2::geom_vline(xintercept =  0,   linetype = "solid",  colour = "grey50") +
+  ggplot2::geom_vline(xintercept =  0.1, linetype = "dashed", colour = "grey50") +
+  ggplot2::geom_vline(xintercept = -0.1, linetype = "dashed", colour = "grey50") +
+  ggplot2::scale_colour_manual(values = c("Unweighted" = "tomato", "IPW Weighted" = "steelblue")) +
+  ggplot2::labs(
+    x       = "Standardised Mean Difference",
+    y       = NULL,
+    colour  = NULL,
+    shape   = NULL,
+    title   = "Figure 2: Covariate Balance Before and After IPW Weighting",
+    caption = "Dashed lines at |SMD| = 0.1 (acceptable balance threshold)."
+  ) +
+  theme_replication()
+```
+
+### Figure 3: Point Estimates Across Estimators
+
+```{r figure3, fig.cap="Democracy effect estimates with 95% cluster-robust CIs. The blue point (IPW/MSM) is the preferred estimator."}
+est_plot_df <- results_table %>%
+  dplyr::mutate(
+    ci_lo     = Estimate - 1.96 * Std.Error,
+    ci_hi     = Estimate + 1.96 * Std.Error,
+    Estimator = factor(
+      Estimator,
+      levels = c("IPW / MSM (preferred)", "First Differences",
+                 "Two-Way FE", "Pooled OLS")
+    )
+  )
+
+ggplot2::ggplot(
+  est_plot_df,
+  ggplot2::aes(x = Estimate, y = Estimator, xmin = ci_lo, xmax = ci_hi,
+               colour = Estimator == "IPW / MSM (preferred)")
+) +
+  ggplot2::geom_pointrange(size = 0.7) +
+  ggplot2::geom_vline(xintercept = 0, linetype = "dashed", colour = "grey40") +
+  ggplot2::scale_colour_manual(
+    values = c("TRUE" = "steelblue", "FALSE" = "grey30"),
+    guide  = "none"
+  ) +
+  ggplot2::labs(
+    x       = "Estimated Effect of Democracy on Log GDP per Capita",
+    y       = NULL,
+    title   = "Figure 3: Democracy Effect Estimates Across Estimators",
+    caption = "Point estimates with 95% cluster-robust CIs (clustered by country).\nBlue: preferred IPW/MSM estimator."
+  ) +
+  theme_replication()
+```
+
+### Figure 4: Propensity Score Overlap
+
+```{r figure4, fig.cap="Overlap in propensity scores for treated (democracy = 1) and control (democracy = 0) units. Overlap is required for IPW identification."}
+ggplot2::ggplot(
+  panel,
+  ggplot2::aes(x = ps_denom, fill = factor(democracy), colour = factor(democracy))
+) +
+  ggplot2::geom_density(alpha = 0.3) +
+  ggplot2::scale_fill_manual(
+    values = c("0" = "tomato",    "1" = "steelblue"),
+    labels = c("0" = "Non-democracy (D=0)", "1" = "Democracy (D=1)")
+  ) +
+  ggplot2::scale_colour_manual(
+    values = c("0" = "tomato",    "1" = "steelblue"),
+    labels = c("0" = "Non-democracy (D=0)", "1" = "Democracy (D=1)")
+  ) +
+  ggplot2::labs(
+    x       = "Estimated Propensity Score",
+    y       = "Density",
+    fill    = NULL,
+    colour  = NULL,
+    title   = "Figure 4: Propensity Score Overlap",
+    caption = "Good overlap (common support) is needed for IPW to work well."
+  ) +
+  theme_replication()
+```
+
+---
+
+## 6  Key Methodological Notes
+
+### 6.1  Why Naive OLS and Fixed Effects Can Be Biased
+
+In TSCS data with time-varying confounders, standard estimators can be biased:
+
+- **Pooled OLS** ignores unobserved unit heterogeneity and past confounders.
+- **Fixed Effects** removes unit-level variation but fails when time-varying covariates are themselves *mediators* of the treatment effect (Blackwell & Glynn call this "dynamic bias").
+- **First Differences** similarly fails under dynamic confounding.
+
+### 6.2  The IPW / MSM Solution
+
+Blackwell & Glynn propose fitting a **marginal structural model** (Robins et al. 2000) via IPW:
+
+1. Estimate propensity scores $\hat{\pi}_{it} = \Pr(D_{it} = 1 \mid \bar{D}_{i,t-1}, \bar{X}_{it})$.
+2. Construct stabilised weights:
+   $$w_{it} = \prod_{s \leq t} \frac{\Pr(D_{is} \mid \bar{D}_{i,s-1})}{\hat{\pi}_{is}}$$
+3. Fit a **weighted fixed-effects regression** of $Y_{it}$ on $D_{it}$ using weights $w_{it}$.
+
+Under the **sequential ignorability** assumption (no unmeasured time-varying confounders), this estimator is consistent for the average causal effect.
+
+### 6.3  Identification Assumption
+
+The key assumption is **sequential ignorability** (also called "selection on observables" in the dynamic setting):
+
+$$D_{it} \perp \!\!\! \perp Y_{it}(\bar{d}) \mid \bar{D}_{i,t-1}, \bar{X}_{it}$$
+
+This is stronger than the usual cross-sectional selection-on-observables assumption because it must hold *at each period* given the **entire history** of covariates and treatments.
+
+---
+
+## 7  Session Info
+
+```{r session-info}
+sessionInfo()
+```
