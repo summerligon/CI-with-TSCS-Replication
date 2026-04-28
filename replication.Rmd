@@ -173,7 +173,7 @@ kableExtra::kable(
   caption = "Table 3: Effect of Democracy on Log GDP per Capita under Alternative Estimators"
 ) %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
-  kableExtra::row_spec(nrow(results_formatted), bold = TRUE, background = "#e8f4fd")
+  kableExtra::row_spec(nrow(results_formatted), bold = TRUE, background = "#cce0f0")
 ```
 
 > **Note:** The IPW / MSM row (highlighted) is the preferred estimator from Blackwell & Glynn (2018).  

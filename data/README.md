@@ -45,7 +45,7 @@ This allows the full analysis pipeline and CI to run without the real data.
 | `year` | Year |
 | `democracy` | Binary democracy indicator (treatment) |
 | `lgdppc` | Log GDP per capita (outcome) |
-| `education` | Secondary school enrolment rate |
+| `education` | Secondary school enrollment rate |
 | `trade` | Trade openness (% GDP) |
 | `lgdppc_lag` | Lagged log GDP per capita |
 | `democracy_lag` | Lagged democracy indicator |

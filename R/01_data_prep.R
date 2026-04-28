@@ -43,7 +43,7 @@ simulate_tscs_data <- function(N = 100, T_periods = 20, seed = 42) {
 
     for (t in seq_len(T_periods)) {
       # Time-varying covariates (confounders)
-      educ  <- 40 + 0.5 * t + rnorm(1, sd = 5)   # education (% enrolment)
+      educ  <- 40 + 0.5 * t + rnorm(1, sd = 5)   # education (% enrollment)
       trade <- 50 + rnorm(1, sd = 10)             # trade openness
 
       # Propensity of treatment depends on history

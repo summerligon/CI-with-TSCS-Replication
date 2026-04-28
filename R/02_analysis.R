@@ -77,8 +77,8 @@ panel <- panel %>%
   ) %>%
   dplyr::ungroup()
 
-# ---- 1e. Trim extreme weights (winsorise at 99th percentile) ----
-#   Extreme weights inflate variance; trimming at the 99th pct is standard practice
+# ---- 1e. Trim extreme weights at 99th percentile ----
+#   Extreme weights inflate variance; trimming (capping) at the 99th pct is standard practice
 trim_99 <- quantile(panel$ipw_cumulative, 0.99, na.rm = TRUE)
 panel <- panel %>%
   dplyr::mutate(
