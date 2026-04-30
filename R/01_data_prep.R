@@ -12,7 +12,7 @@ source(here::here("R", "00_setup.R"))
 # ------------------------------------------------------------------
 # Path to the real replication data (update if filename differs)
 # ------------------------------------------------------------------
-DATA_FILE <- here::here("data", "panel_data.dta")
+DATA_FILE <- here::here("data", "burgoon.csv")
 
 # ------------------------------------------------------------------ #
 #  Helper: Simulate TSCS data                                         #
